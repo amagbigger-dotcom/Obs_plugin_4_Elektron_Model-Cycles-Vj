@@ -1,4 +1,4 @@
-﻿#define NOMINMAX
+#define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <mmsystem.h>
@@ -13,6 +13,9 @@
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE("cycles_vj", "en-US")
 
+// =========================================================================
+// MIDI MOTOR (Multi-Device, Multi-Channel, Note Decay & CC Router)
+// =========================================================================
 class MidiCore {
 public:
     static MidiCore& instance() { static MidiCore inst; return inst; }
