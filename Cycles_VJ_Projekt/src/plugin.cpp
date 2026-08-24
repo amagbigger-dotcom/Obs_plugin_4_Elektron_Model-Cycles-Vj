@@ -1419,7 +1419,7 @@ static void df_def(obs_data_t* s) {
     obs_data_set_default_double(s, "zoom", 1.0); obs_data_set_default_int(s, "czoom", 21); obs_data_set_default_double(s, "rot", 0.0); obs_data_set_default_int(s, "crot", 19); obs_data_set_default_double(s, "mx", 1.0); obs_data_set_default_int(s, "cmx", 7);
 }
 static void df_rd(void* d, gs_effect_t*) {
-    auto* x = (df_d*)d; if (!x->eff || !obs_source_process_filter_begin(x->ctx, GS_RGBA, OBS_ALLOW_DIRECT_RENDERING)) return;
+    auto* x = (df_d*)d; if (!x->eff || !obs_source_process_filter_begin(x->ctx, GS_RGBA, OBS_ALLOW_DIRECT_Rendering)) return;
     auto& m = MidiCore::instance(); float note_hit = m.get_note(x->dev, x->ch) * x->n_int;
     gs_effect_set_float(gs_effect_get_param_by_name(x->eff, "p_drive"), x->drive + (m.get_cc(x->dev, x->ch, x->cdrive) * 4.0f) + (note_hit * 2.0f));
     gs_effect_set_float(gs_effect_get_param_by_name(x->eff, "p_bleed"), x->bleed + (m.get_cc(x->dev, x->ch, x->cbleed) * 3.0f));
@@ -1583,32 +1583,61 @@ static obs_properties_t* wv_pr(void*) {
     return p;
 }
 
-static obs_source_info s_to, s_bl, s_br, s_brt, s_cm, s_cr, s_ex, s_fi, s_hs, s_kl, s_pn, s_px, s_rg, s_sc, s_sl, s_sp, s_st, s_tw, s_zo, s_df, s_fd, s_wv;
+// =========================================================================
+// OBS MODUL REGISZTRACIO (DLL-specifikus felteteles regisztracio)
+// =========================================================================
+static obs_source_info s_active_info;
 
 bool obs_module_load(void) {
     MidiCore::instance().init();
-    s_to = reg_f("vz_2tonr", to_n, to_cr, to_ds, to_up, to_def, to_pr, to_rd); obs_register_source(&s_to);
-    s_bl = reg_f("vz_blurr", bl_n, bl_cr, bl_ds, bl_up, bl_def, bl_pr, bl_rd); obs_register_source(&s_bl);
-    s_br = reg_f("vz_brcosr", br_n, br_cr, br_ds, br_up, br_def, br_pr, br_rd); obs_register_source(&s_br);
-    s_brt = reg_f("vz_breathr", brt_n, brt_cr, brt_ds, brt_up, brt_def, brt_pr, brt_rd); obs_register_source(&s_brt);
-    s_cm = reg_f("vz_clrmapr", cm_n, cm_cr, cm_ds, cm_up, cm_def, cm_pr, cm_rd); obs_register_source(&s_cm);
-    s_cr = reg_f("vz_cropr", cr_n, cr_cr, cr_ds, cr_up, cr_def, cr_pr, cr_rd); obs_register_source(&s_cr);
-    s_ex = reg_f("vz_exposr", ex_n, ex_cr, ex_ds, ex_up, ex_def, ex_pr, ex_rd); obs_register_source(&s_ex);
-    s_fi = reg_f("vz_fisheyr", fi_n, fi_cr, fi_ds, fi_up, fi_def, fi_pr, fi_rd); obs_register_source(&s_fi);
-    s_hs = reg_f("vz_hueshiftr", hs_n, hs_cr, hs_ds, hs_up, hs_def, hs_pr, hs_rd); obs_register_source(&s_hs);
-    s_kl = reg_f("vz_kaleidr", kl_n, kl_cr, kl_ds, kl_up, kl_def, kl_pr, kl_rd); obs_register_source(&s_kl);
-    s_pn = reg_f("vz_pinchr", pn_n, pn_cr, pn_ds, pn_up, pn_def, pn_pr, pn_rd); obs_register_source(&s_pn);
-    s_px = reg_f("vz_pixel8r", px_n, px_cr, px_ds, px_up, px_def, px_pr, px_rd); obs_register_source(&s_px);
-    s_rg = reg_f("vz_rgbr", rg_n, rg_cr, rg_ds, rg_up, rg_def, rg_pr, rg_rd); obs_register_source(&s_rg);
-    s_sc = reg_f("vz_scanlines", sc_n, sc_cr, sc_ds, sc_up, sc_def, sc_pr, sc_rd); obs_register_source(&s_sc);
-    s_sl = reg_f("vz_slicr", sl_n, sl_cr, sl_ds, sl_up, sl_def, sl_pr, sl_rd); obs_register_source(&s_sl);
-    s_sp = reg_f("vz_sprinklr", sp_n, sp_cr, sp_ds, sp_up, sp_def, sp_pr, sp_rd); obs_register_source(&s_sp);
-    s_st = reg_f("vz_strobr", st_n, st_cr, st_ds, st_up, st_def, st_pr, st_rd); obs_register_source(&s_st);
-    s_tw = reg_f("vz_twistr", tw_n, tw_cr, tw_ds, tw_up, tw_def, tw_pr, tw_rd); obs_register_source(&s_tw);
-    s_zo = reg_f("vz_zoropr", zo_n, zo_cr, zo_ds, zo_up, zo_def, zo_pr, zo_rd); obs_register_source(&s_zo);
-    s_df = reg_f("vz_drtyfeedr", df_n, df_cr, df_ds, df_up, df_def, df_pr, df_rd); obs_register_source(&s_df);
-    s_fd = reg_f("vz_feedr", fd_n, fd_cr, fd_ds, fd_up, fd_def, fd_pr, fd_rd); obs_register_source(&s_fd);
-    s_wv = reg_f("vz_wavr", wv_n, wv_cr, wv_ds, wv_up, wv_def, wv_pr, wv_rd); obs_register_source(&s_wv);
+
+#if defined(BUILD_VZ_2TONR)
+    s_active_info = reg_f("vz_2tonr", to_n, to_cr, to_ds, to_up, to_def, to_pr, to_rd);
+#elif defined(BUILD_VZ_BLURR)
+    s_active_info = reg_f("vz_blurr", bl_n, bl_cr, bl_ds, bl_up, bl_def, bl_pr, bl_rd);
+#elif defined(BUILD_VZ_BRCOSR)
+    s_active_info = reg_f("vz_brcosr", br_n, br_cr, br_ds, br_up, br_def, br_pr, br_rd);
+#elif defined(BUILD_VZ_BREATHR)
+    s_active_info = reg_f("vz_breathr", brt_n, brt_cr, brt_ds, brt_up, brt_def, brt_pr, brt_rd);
+#elif defined(BUILD_VZ_CLRMAPR)
+    s_active_info = reg_f("vz_clrmapr", cm_n, cm_cr, cm_ds, cm_up, cm_def, cm_pr, cm_rd);
+#elif defined(BUILD_VZ_CROPR)
+    s_active_info = reg_f("vz_cropr", cr_n, cr_cr, cr_ds, cr_up, cr_def, cr_pr, cr_rd);
+#elif defined(BUILD_VZ_EXPOSR)
+    s_active_info = reg_f("vz_exposr", ex_n, ex_cr, ex_ds, ex_up, ex_def, ex_pr, ex_rd);
+#elif defined(BUILD_VZ_FISHEYR)
+    s_active_info = reg_f("vz_fisheyr", fi_n, fi_cr, fi_ds, fi_up, fi_def, fi_pr, fi_rd);
+#elif defined(BUILD_VZ_HUESHIFTR)
+    s_active_info = reg_f("vz_hueshiftr", hs_n, hs_cr, hs_ds, hs_up, hs_def, hs_pr, hs_rd);
+#elif defined(BUILD_VZ_KALEIDR)
+    s_active_info = reg_f("vz_kaleidr", kl_n, kl_cr, kl_ds, kl_up, kl_def, kl_pr, kl_rd);
+#elif defined(BUILD_VZ_PINCHR)
+    s_active_info = reg_f("vz_pinchr", pn_n, pn_cr, pn_ds, pn_up, pn_def, pn_pr, pn_rd);
+#elif defined(BUILD_VZ_PIXEL8R)
+    s_active_info = reg_f("vz_pixel8r", px_n, px_cr, px_ds, px_up, px_def, px_pr, px_rd);
+#elif defined(BUILD_VZ_RGBR)
+    s_active_info = reg_f("vz_rgbr", rg_n, rg_cr, rg_ds, rg_up, rg_def, rg_pr, rg_rd);
+#elif defined(BUILD_VZ_SCANLINES)
+    s_active_info = reg_f("vz_scanlines", sc_n, sc_cr, sc_ds, sc_up, sc_def, sc_pr, sc_rd);
+#elif defined(BUILD_VZ_SLICR)
+    s_active_info = reg_f("vz_slicr", sl_n, sl_cr, sl_ds, sl_up, sl_def, sl_pr, sl_rd);
+#elif defined(BUILD_VZ_SPRINKLR)
+    s_active_info = reg_f("vz_sprinklr", sp_n, sp_cr, sp_ds, sp_up, sp_def, sp_pr, sp_rd);
+#elif defined(BUILD_VZ_STROBR)
+    s_active_info = reg_f("vz_strobr", st_n, st_cr, st_ds, st_up, st_def, st_pr, st_rd);
+#elif defined(BUILD_VZ_TWISTR)
+    s_active_info = reg_f("vz_twistr", tw_n, tw_cr, tw_ds, tw_up, tw_def, tw_pr, tw_rd);
+#elif defined(BUILD_VZ_ZOROPR)
+    s_active_info = reg_f("vz_zoropr", zo_n, zo_cr, zo_ds, zo_up, zo_def, zo_pr, zo_rd);
+#elif defined(BUILD_VZ_DRTYFEEDR)
+    s_active_info = reg_f("vz_drtyfeedr", df_n, df_cr, df_ds, df_up, df_def, df_pr, df_rd);
+#elif defined(BUILD_VZ_FEEDR)
+    s_active_info = reg_f("vz_feedr", fd_n, fd_cr, fd_ds, fd_up, fd_def, fd_pr, fd_rd);
+#elif defined(BUILD_VZ_WAVR)
+    s_active_info = reg_f("vz_wavr", wv_n, wv_cr, wv_ds, wv_up, wv_def, wv_pr, wv_rd);
+#endif
+
+    obs_register_source(&s_active_info);
     return true;
 }
 
