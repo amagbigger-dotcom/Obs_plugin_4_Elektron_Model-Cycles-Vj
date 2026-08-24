@@ -28,63 +28,48 @@ jobs:
         
         New-Item -ItemType Directory -Path "C:\obs-bin", "C:\obs-dev" -Force | Out-Null
         
-        Write-Host "OBS 30.0.2 letoltesi URL lekerese a GitHub API-bol..."
+        Write-Host "OBS letoltese..."
         $release = Invoke-RestMethod -Uri "https://api.github.com/repos/obsproject/obs-studio/releases/tags/30.0.2" -Headers @{ "User-Agent" = "PowerShell" }
         $asset = $release.assets | Where-Object { $_.name -like "*.zip" -and $_.name -notlike "*pdb*" } | Select-Object -First 1
         
-        if (-not $asset) {
-            $downloadUrl = "https://github.com/obsproject/obs-studio/releases/download/30.0.2/OBS-Studio-30.0.2.zip"
-        } else {
-            $downloadUrl = $asset.browser_download_url
-        }
-        
-        Write-Host "Letoltes innen: $downloadUrl"
+        $downloadUrl = if ($asset) { $asset.browser_download_url } else { "https://github.com/obsproject/obs-studio/releases/download/30.0.2/OBS-Studio-30.0.2.zip" }
         curl.exe -fL $downloadUrl -o "obs.zip"
         
-        Write-Host "Kibontas folyamatban..."
         7z x "obs.zip" -o"C:\obs-bin" -y | Out-Null
-        
-        Write-Host "OBS forraskod letoltese..."
         git clone --depth 1 https://github.com/obsproject/obs-studio.git -b 30.0.2 C:\obs-src
         
-        # obs.dll felkutatasa
         $dll = Get-ChildItem -Path "C:\obs-bin" -Filter "obs.dll" -Recurse | Select-Object -First 1 -ExpandProperty FullName
-        if (-not $dll) {
-            throw "Nem talalhato az obs.dll a kibontott fajlok kozott!"
-        }
-        Write-Host "Megtalalt DLL: $dll"
-        
-        # Exportok kinyerese es .lib generalasa
         $rawDump = & dumpbin /exports $dll
         $exports = $rawDump | ForEach-Object {
             if ($_ -match '^\s+\d+\s+[0-9A-F]+\s+[0-9A-F]+\s+(\S+)') { $matches[1] }
-        }
-        
-        if (-not $exports) {
-            throw "Nem sikerult exportokat talalni az obs.dll-ben!"
         }
         
         $defContent = @("EXPORTS") + $exports
         [System.IO.File]::WriteAllLines("C:\obs-dev\obs.def", $defContent, [System.Text.Encoding]::ASCII)
         
         & lib /def:C:\obs-dev\obs.def /out:C:\obs-dev\obs.lib /machine:x64
-        Write-Host "C:\obs-dev\obs.lib sikeresen eloallitva!"
 
     - name: 5. Forditas (DLL)
       shell: pwsh
       run: |
         $ErrorActionPreference = "Stop"
         
-        # Automatikusan megkeresi a CMakeLists.txt fajlt a repoban
         $cmakeFile = Get-ChildItem -Path . -Filter "CMakeLists.txt" -Recurse | Select-Object -First 1
-        if (-not $cmakeFile) {
-            throw "Nem talalhato CMakeLists.txt a repoban! Gyozodj meg rola, hogy feltoltotted a CMakeLists.txt fajlt."
-        }
         $sourceDir = $cmakeFile.DirectoryName
-        Write-Host "CMakeLists.txt konyvtar: $sourceDir"
         
-        cmake -B build -S "$sourceDir" -DCMAKE_BUILD_TYPE=Release -DOBS_SRC="C:/obs-src" -DOBS_LIB_DIR="C:/obs-dev"
-        cmake --build build --config Release --parallel
+        # A CMake buildet a projekt almappájába irányítjuk, hogy a setup.iss relatív útvonala egyezzen
+        cmake -B "$sourceDir/build" -S "$sourceDir" -DCMAKE_BUILD_TYPE=Release -DOBS_SRC="C:/obs-src" -DOBS_LIB_DIR="C:/obs-dev"
+        cmake --build "$sourceDir/build" --config Release --parallel
+        
+        # Biztosítjuk, hogy mindkét néven (kötőjeles és aláhúzásos) létezzen a DLL az Inno Setup számára
+        $dlls = Get-ChildItem -Path "$sourceDir/build" -Filter "*.dll" -Recurse
+        foreach ($d in $dlls) {
+            Write-Host "Leforditott DLL: $($d.FullName)"
+            $altName1 = Join-Path $d.DirectoryName "cycles_vj.dll"
+            $altName2 = Join-Path $d.DirectoryName "cycles-vj.dll"
+            Copy-Item $d.FullName -Destination $altName1 -Force
+            Copy-Item $d.FullName -Destination $altName2 -Force
+        }
 
     - name: 6. Telepito (.exe) Generalasa
       shell: pwsh
@@ -96,20 +81,15 @@ jobs:
             $iscc = (Get-Command ISCC.exe -ErrorAction Stop).Source
         }
         
-        # Inno Setup szkript megkeresese
         $issFile = Get-ChildItem -Path . -Filter "setup.iss" -Recurse | Select-Object -First 1
-        if ($issFile) {
-            & $iscc $issFile.FullName
-        } else {
-            & $iscc installer/setup.iss
-        }
+        Write-Host "Inno Setup futtatasa: $($issFile.FullName)"
+        & $iscc $issFile.FullName
 
     - name: 7. Telepito Feltoltese
       uses: actions/upload-artifact@v4
       with:
         name: Cycles_VJ_Plugin_Setup
         path: |
-          installer/Output/*.exe
-          Output/*.exe
-          build/Release/*.dll
+          **/Output/*.exe
+          **/build/Release/*.dll
         if-no-files-found: error
