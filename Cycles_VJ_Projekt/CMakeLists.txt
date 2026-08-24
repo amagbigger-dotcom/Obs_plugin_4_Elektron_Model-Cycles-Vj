@@ -18,47 +18,50 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-# Megkeressuk a plugin.cpp-t
+# plugin.cpp felkutatása
 file(GLOB_RECURSE SRC_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "plugin.cpp" "src/plugin.cpp")
 list(GET SRC_FILES 0 MAIN_SRC)
+message(STATUS "Forrasfajl a forditasokhoz: ${MAIN_SRC}")
 
-# A 22 plugin neve es fordítási flagje
+# A 22 kulonallo plugin neve
 set(PLUGINS
-    "vz_2tonr;BUILD_VZ_2TONR"
-    "vz_blurr;BUILD_VZ_BLURR"
-    "vz_brcosr;BUILD_VZ_BRCOSR"
-    "vz_breathr;BUILD_VZ_BREATHR"
-    "vz_clrmapr;BUILD_VZ_CLRMAPR"
-    "vz_cropr;BUILD_VZ_CROPR"
-    "vz_exposr;BUILD_VZ_EXPOSR"
-    "vz_fisheyr;BUILD_VZ_FISHEYR"
-    "vz_hueshiftr;BUILD_VZ_HUESHIFTR"
-    "vz_kaleidr;BUILD_VZ_KALEIDR"
-    "vz_pinchr;BUILD_VZ_PINCHR"
-    "vz_pixel8r;BUILD_VZ_PIXEL8R"
-    "vz_rgbr;BUILD_VZ_RGBR"
-    "vz_scanlines;BUILD_VZ_SCANLINES"
-    "vz_slicr;BUILD_VZ_SLICR"
-    "vz_sprinklr;BUILD_VZ_SPRINKLR"
-    "vz_strobr;BUILD_VZ_STROBR"
-    "vz_twistr;BUILD_VZ_TWISTR"
-    "vz_zoropr;BUILD_VZ_ZOROPR"
-    "vz_drtyfeedr;BUILD_VZ_DRTYFEEDR"
-    "vz_feedr;BUILD_VZ_FEEDR"
-    "vz_wavr;BUILD_VZ_WAVR"
+    vz_2tonr
+    vz_blurr
+    vz_brcosr
+    vz_breathr
+    vz_clrmapr
+    vz_cropr
+    vz_exposr
+    vz_fisheyr
+    vz_hueshiftr
+    vz_kaleidr
+    vz_pinchr
+    vz_pixel8r
+    vz_rgbr
+    vz_scanlines
+    vz_slicr
+    vz_sprinklr
+    vz_strobr
+    vz_twistr
+    vz_zoropr
+    vz_drtyfeedr
+    vz_feedr
+    vz_wavr
 )
 
-foreach(ITEM ${PLUGINS})
-    list(GET ITEM 0 TARGET_NAME)
-    list(GET ITEM 1 DEF_FLAG)
+# Mind a 22 DLL letrehozasa a megfelelo BUILD_ makroval
+foreach(PLUGIN_NAME ${PLUGINS})
+    string(TOUPPER ${PLUGIN_NAME} UPPER_NAME)
+    set(DEF_FLAG "BUILD_${UPPER_NAME}")
     
-    add_library(${TARGET_NAME} MODULE ${MAIN_SRC})
-    target_compile_definitions(${TARGET_NAME} PRIVATE ${DEF_FLAG})
-    target_link_directories(${TARGET_NAME} PRIVATE ${OBS_LIB_DIR})
-    target_link_libraries(${TARGET_NAME} PRIVATE obs winmm)
+    add_library(${PLUGIN_NAME} MODULE ${MAIN_SRC})
+    target_compile_definitions(${PLUGIN_NAME} PRIVATE ${DEF_FLAG})
+    target_link_directories(${PLUGIN_NAME} PRIVATE ${OBS_LIB_DIR})
+    target_link_libraries(${PLUGIN_NAME} PRIVATE obs winmm)
     
-    set_target_properties(${TARGET_NAME} PROPERTIES
+    set_target_properties(${PLUGIN_NAME} PROPERTIES
         PREFIX ""
-        OUTPUT_NAME ${TARGET_NAME}
+        OUTPUT_NAME ${PLUGIN_NAME}
     )
+    message(STATUS "DLL cel regisztralva: ${PLUGIN_NAME} (${DEF_FLAG})")
 endforeach()
