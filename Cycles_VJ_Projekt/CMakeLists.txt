@@ -15,10 +15,25 @@ endif()
 include_directories(
     ${OBS_SRC}/libobs
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-# Csak a konkrét forrásfájlt adjuk hozzá, így a CMake belső fájljai nem kerülnek bele
-add_library(${PROJECT_NAME} MODULE plugin.cpp)
+# plugin.cpp megkeresése (kizárva a build mappát)
+file(GLOB_RECURSE PLUGIN_SOURCES 
+    RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
+    "*.cpp" "*.c"
+)
+list(FILTER PLUGIN_SOURCES EXCLUDE REGEX "^build/.*")
+list(FILTER PLUGIN_SOURCES EXCLUDE REGEX "^CMakeFiles/.*")
+list(FILTER PLUGIN_SOURCES EXCLUDE REGEX "CMake.*CompilerId.*")
+
+if(NOT PLUGIN_SOURCES)
+    message(FATAL_ERROR "Nem talalhato forrasfajl (plugin.cpp)!")
+endif()
+
+message(STATUS "Forrasfajlok: ${PLUGIN_SOURCES}")
+
+add_library(${PROJECT_NAME} MODULE ${PLUGIN_SOURCES})
 
 target_link_directories(${PROJECT_NAME} PRIVATE ${OBS_LIB_DIR})
 
