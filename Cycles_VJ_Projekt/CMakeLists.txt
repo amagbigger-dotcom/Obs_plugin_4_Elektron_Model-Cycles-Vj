@@ -1,21 +1,45 @@
-﻿cmake_minimum_required(VERSION 3.16)
-project(cycles_vj LANGUAGES C CXX)
+cmake_minimum_required(VERSION 3.16)
+project(cycles-vj-obs-plugin C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-if(OBS_SRC)
-    include_directories("${OBS_SRC}/libobs")
+# OBS források és könyvtárak elérési útja
+if(NOT DEFINED OBS_SRC)
+    set(OBS_SRC "C:/obs-src" CACHE PATH "Path to OBS Studio source")
 endif()
 
-if(OBS_LIB_DIR)
-    link_directories("${OBS_LIB_DIR}")
+if(NOT DEFINED OBS_LIB_DIR)
+    set(OBS_LIB_DIR "C:/obs-dev" CACHE PATH "Path to OBS .lib directory")
 endif()
 
-add_library(cycles_vj MODULE "src/plugin.cpp")
-target_include_directories(cycles_vj PRIVATE src "${OBS_SRC}/libobs")
+# OBS include útvonalak hozzáadása
+include_directories(
+    ${OBS_SRC}/libobs
+    src
+)
 
-if(WIN32)
-    target_link_libraries(cycles_vj PRIVATE obs winmm)
-    set_target_properties(cycles_vj PROPERTIES PREFIX "" OUTPUT_NAME "cycles_vj")
+# Forrásfájlok összegyűjtése a projektből
+file(GLOB_RECURSE PLUGIN_SOURCES 
+    "src/*.cpp" 
+    "src/*.c" 
+    "src/*.hpp" 
+    "src/*.h"
+)
+
+# Ha a gyökérben vannak a források és nem az src mappában:
+if(NOT PLUGIN_SOURCES)
+    file(GLOB PLUGIN_SOURCES "*.cpp" "*.c" "*.hpp" "*.h")
 endif()
+
+# Plugin DLL létrehozása
+add_library(${PROJECT_NAME} MODULE ${PLUGIN_SOURCES})
+
+# Csatolás az obs.lib-hez
+target_link_directories(${PROJECT_NAME} PRIVATE ${OBS_LIB_DIR})
+target_link_libraries(${PROJECT_NAME} PRIVATE obs)
+
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    PREFIX ""
+    OUTPUT_NAME "cycles-vj"
+)
