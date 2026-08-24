@@ -57,18 +57,16 @@ jobs:
         $cmakeFile = Get-ChildItem -Path . -Filter "CMakeLists.txt" -Recurse | Select-Object -First 1
         $sourceDir = $cmakeFile.DirectoryName
         
-        # A CMake buildet a projekt almappájába irányítjuk, hogy a setup.iss relatív útvonala egyezzen
         cmake -B "$sourceDir/build" -S "$sourceDir" -DCMAKE_BUILD_TYPE=Release -DOBS_SRC="C:/obs-src" -DOBS_LIB_DIR="C:/obs-dev"
         cmake --build "$sourceDir/build" --config Release --parallel
         
-        # Biztosítjuk, hogy mindkét néven (kötőjeles és aláhúzásos) létezzen a DLL az Inno Setup számára
-        $dlls = Get-ChildItem -Path "$sourceDir/build" -Filter "*.dll" -Recurse
-        foreach ($d in $dlls) {
-            Write-Host "Leforditott DLL: $($d.FullName)"
-            $altName1 = Join-Path $d.DirectoryName "cycles_vj.dll"
-            $altName2 = Join-Path $d.DirectoryName "cycles-vj.dll"
-            Copy-Item $d.FullName -Destination $altName1 -Force
-            Copy-Item $d.FullName -Destination $altName2 -Force
+        # Biztositjuk az alahuzasos nevet is az Inno Setup szamara onmagara masolas nelkul
+        $builtDll = Get-ChildItem -Path "$sourceDir/build" -Filter "cycles-vj.dll" -Recurse | Select-Object -First 1
+        if ($builtDll) {
+            $altTarget = Join-Path $builtDll.DirectoryName "cycles_vj.dll"
+            if ($builtDll.FullName -ne $altTarget) {
+                Copy-Item $builtDll.FullName -Destination $altTarget -Force
+            }
         }
 
     - name: 6. Telepito (.exe) Generalasa
