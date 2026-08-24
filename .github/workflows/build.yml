@@ -1,0 +1,73 @@
+name: Build Cycles VJ OBS Plugin
+
+on:
+  push:
+    branches: [ "**" ]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-2022
+
+    steps:
+    - name: 1. Forras letoltese
+      uses: actions/checkout@v4
+
+    - name: 2. MSVC Fordito beallitasa
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64
+
+    - name: 3. Inno Setup Telepitese
+      run: choco install innosetup -y --no-progress
+
+    - name: 4. OBS SDK es Lib elokeszitese
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = "Stop"
+        
+        New-Item -ItemType Directory -Path "C:\obs-bin", "C:\obs-dev" -Force | Out-Null
+        
+        # Gyorsabb és megbízhatóbb letöltés CI környezetben
+        curl.exe -L "https://github.com/obsproject/obs-studio/releases/download/30.0.2/OBS-Studio-30.0.2-Full-x64.zip" -o "obs.zip"
+        Expand-Archive -Path "obs.zip" -DestinationPath "C:\obs-bin" -Force
+        git clone --depth 1 --branch 30.0.2 https://github.com/obsproject/obs-studio.git C:\obs-src
+        
+        # obs.dll exportjainak kinyerese es import lib generalasa
+        $dll = "C:\obs-bin\bin\64bit\obs.dll"
+        $rawDump = dumpbin /exports $dll
+        $exports = $rawDump | ForEach-Object {
+            if ($_ -match '^\s+\d+\s+[0-9A-F]+\s+[0-9A-F]+\s+(\S+)') { $matches[1] }
+        }
+        
+        if (-not $exports) {
+            throw "Nem sikerult exportokat talalni az obs.dll-ben!"
+        }
+        
+        $defContent = @("EXPORTS") + $exports
+        [System.IO.File]::WriteAllLines("C:\obs-dev\obs.def", $defContent, [System.Text.Encoding]::ASCII)
+        
+        lib /def:C:\obs-dev\obs.def /out:C:\obs-dev\obs.lib /machine:x64
+
+    - name: 5. Forditas (DLL)
+      shell: pwsh
+      run: |
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DOBS_SRC="C:/obs-src" -DOBS_LIB_DIR="C:/obs-dev"
+        cmake --build build --config Release --parallel
+
+    - name: 6. Telepito (.exe) Generalasa
+      shell: pwsh
+      run: |
+        # Inno Setup ISCC meghivasa kornyezeti valtozobol / default utvonalrol
+        $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+        if (-not (Test-Path $iscc)) {
+            $iscc = (Get-Command ISCC.exe -ErrorAction Stop).Source
+        }
+        & $iscc installer/setup.iss
+
+    - name: 7. Telepito Feltoltese
+      uses: actions/upload-artifact@v4
+      with:
+        name: Cycles_VJ_Plugin_Setup
+        path: installer/Output/Cycles_VJ_Setup.exe
+        if-no-files-found: error
