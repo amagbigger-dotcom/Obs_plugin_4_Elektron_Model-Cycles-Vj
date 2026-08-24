@@ -28,14 +28,32 @@ jobs:
         
         New-Item -ItemType Directory -Path "C:\obs-bin", "C:\obs-dev" -Force | Out-Null
         
-        # Gyorsabb és megbízhatóbb letöltés CI környezetben
-        curl.exe -L "https://github.com/obsproject/obs-studio/releases/download/30.0.2/OBS-Studio-30.0.2-Full-x64.zip" -o "obs.zip"
-        Expand-Archive -Path "obs.zip" -DestinationPath "C:\obs-bin" -Force
+        # Valodi letoltesi URL es fallbacks
+        $url1 = "https://github.com/obsproject/obs-studio/releases/download/30.0.2/OBS-Studio-30.0.2-Windows-x64.zip"
+        $url2 = "https://github.com/obsproject/obs-studio/releases/download/30.0.2/OBS-Studio-30.0.2-Full-x64.zip"
+        
+        Write-Host "OBS letoltese..."
+        curl.exe -fL $url1 -o "obs.zip"
+        if (-not (Test-Path "obs.zip") -or (Get-Item "obs.zip").Length -lt 1000000) {
+            Write-Host "Masodik URL kiprobalasa..."
+            curl.exe -fL $url2 -o "obs.zip"
+        }
+        
+        # Kibontas 7-Zip-pel
+        7z x "obs.zip" -o"C:\obs-bin" -y | Out-Null
+        
+        # OBS forraskod letoltese a fejlecfajlokhoz
         git clone --depth 1 --branch 30.0.2 https://github.com/obsproject/obs-studio.git C:\obs-src
         
-        # obs.dll exportjainak kinyerese es import lib generalasa
-        $dll = "C:\obs-bin\bin\64bit\obs.dll"
-        $rawDump = dumpbin /exports $dll
+        # obs.dll dinamikus felkutatasa
+        $dll = Get-ChildItem -Path "C:\obs-bin" -Filter "obs.dll" -Recurse | Select-Object -First 1 -ExpandProperty FullName
+        if (-not $dll) {
+            throw "Nem talalhato az obs.dll a kibontott fajlok kozott!"
+        }
+        Write-Host "Megtalalt DLL: $dll"
+        
+        # Exportok kinyerese es .lib generalasa
+        $rawDump = & dumpbin /exports $dll
         $exports = $rawDump | ForEach-Object {
             if ($_ -match '^\s+\d+\s+[0-9A-F]+\s+[0-9A-F]+\s+(\S+)') { $matches[1] }
         }
@@ -47,7 +65,7 @@ jobs:
         $defContent = @("EXPORTS") + $exports
         [System.IO.File]::WriteAllLines("C:\obs-dev\obs.def", $defContent, [System.Text.Encoding]::ASCII)
         
-        lib /def:C:\obs-dev\obs.def /out:C:\obs-dev\obs.lib /machine:x64
+        & lib /def:C:\obs-dev\obs.def /out:C:\obs-dev\obs.lib /machine:x64
 
     - name: 5. Forditas (DLL)
       shell: pwsh
@@ -58,7 +76,6 @@ jobs:
     - name: 6. Telepito (.exe) Generalasa
       shell: pwsh
       run: |
-        # Inno Setup ISCC meghivasa kornyezeti valtozobol / default utvonalrol
         $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
         if (-not (Test-Path $iscc)) {
             $iscc = (Get-Command ISCC.exe -ErrorAction Stop).Source
