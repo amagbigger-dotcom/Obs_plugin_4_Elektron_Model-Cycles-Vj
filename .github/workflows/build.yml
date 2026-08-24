@@ -28,21 +28,28 @@ jobs:
         
         New-Item -ItemType Directory -Path "C:\obs-bin", "C:\obs-dev" -Force | Out-Null
         
-        # Hivatalos letoltesi URL az OBS 30.0.2 Windows ZIP-hez
-        $url = "https://github.com/obsproject/obs-studio/releases/download/30.0.2/OBS-Studio-30.0.2-Windows.zip"
+        # GitHub API-val kikeressuk a pontos .zip asset letoltesi linkjet
+        Write-Host "OBS 30.0.2 letoltesi URL lekerese a GitHub API-bol..."
+        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/obsproject/obs-studio/releases/tags/30.0.2" -Headers @{ "User-Agent" = "PowerShell" }
+        $asset = $release.assets | Where-Object { $_.name -like "*.zip" -and $_.name -notlike "*pdb*" } | Select-Object -First 1
         
-        Write-Host "OBS Studio letoltese innen: $url"
-        curl.exe -fL $url -o "obs.zip"
+        if (-not $asset) {
+            # Tartalek URL a standard OBS-Studio-30.0.2.zip nevhez
+            $downloadUrl = "https://github.com/obsproject/obs-studio/releases/download/30.0.2/OBS-Studio-30.0.2.zip"
+        } else {
+            $downloadUrl = $asset.browser_download_url
+        }
         
-        # Kibontas 7-Zip-pel
+        Write-Host "Letoltes innen: $downloadUrl"
+        curl.exe -fL $downloadUrl -o "obs.zip"
+        
         Write-Host "Kibontas folyamatban..."
         7z x "obs.zip" -o"C:\obs-bin" -y | Out-Null
         
-        # OBS forraskod letoltese a fejlecfajlokhoz
-        Write-Host "OBS header forrasok letoltese..."
-        git clone --depth 1 --branch 30.0.2 https://github.com/obsproject/obs-studio.git C:\obs-src
+        Write-Host "OBS forraskod letoltese..."
+        git clone --depth 1 https://github.com/obsproject/obs-studio.git -b 30.0.2 C:\obs-src
         
-        # obs.dll felkutatasa
+        # obs.dll dinamikus megkeresese
         $dll = Get-ChildItem -Path "C:\obs-bin" -Filter "obs.dll" -Recurse | Select-Object -First 1 -ExpandProperty FullName
         if (-not $dll) {
             throw "Nem talalhato az obs.dll a kibontott fajlok kozott!"
@@ -63,7 +70,7 @@ jobs:
         [System.IO.File]::WriteAllLines("C:\obs-dev\obs.def", $defContent, [System.Text.Encoding]::ASCII)
         
         & lib /def:C:\obs-dev\obs.def /out:C:\obs-dev\obs.lib /machine:x64
-        Write-Host "OBS.lib sikeresen letrehozva C:\obs-dev\obs.lib helyen."
+        Write-Host "C:\obs-dev\obs.lib sikeresen eloallitva!"
 
     - name: 5. Forditas (DLL)
       shell: pwsh
