@@ -49,7 +49,7 @@ jobs:
         
         & lib /def:C:\obs-dev\obs.def /out:C:\obs-dev\obs.lib /machine:x64
 
-    - name: 5. Forditas (DLL)
+    - name: 5. Forditas (Mind a 22 DLL)
       shell: pwsh
       run: |
         $ErrorActionPreference = "Stop"
@@ -59,15 +59,6 @@ jobs:
         
         cmake -B "$sourceDir/build" -S "$sourceDir" -DCMAKE_BUILD_TYPE=Release -DOBS_SRC="C:/obs-src" -DOBS_LIB_DIR="C:/obs-dev"
         cmake --build "$sourceDir/build" --config Release --parallel
-        
-        # Biztositjuk az alahuzasos nevet is az Inno Setup szamara onmagara masolas nelkul
-        $builtDll = Get-ChildItem -Path "$sourceDir/build" -Filter "cycles-vj.dll" -Recurse | Select-Object -First 1
-        if ($builtDll) {
-            $altTarget = Join-Path $builtDll.DirectoryName "cycles_vj.dll"
-            if ($builtDll.FullName -ne $altTarget) {
-                Copy-Item $builtDll.FullName -Destination $altTarget -Force
-            }
-        }
 
     - name: 6. Telepito (.exe) Generalasa
       shell: pwsh
