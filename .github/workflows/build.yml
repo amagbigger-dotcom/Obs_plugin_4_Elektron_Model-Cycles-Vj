@@ -28,24 +28,21 @@ jobs:
         
         New-Item -ItemType Directory -Path "C:\obs-bin", "C:\obs-dev" -Force | Out-Null
         
-        # Valodi letoltesi URL es fallbacks
-        $url1 = "https://github.com/obsproject/obs-studio/releases/download/30.0.2/OBS-Studio-30.0.2-Windows-x64.zip"
-        $url2 = "https://github.com/obsproject/obs-studio/releases/download/30.0.2/OBS-Studio-30.0.2-Full-x64.zip"
+        # Hivatalos letoltesi URL az OBS 30.0.2 Windows ZIP-hez
+        $url = "https://github.com/obsproject/obs-studio/releases/download/30.0.2/OBS-Studio-30.0.2-Windows.zip"
         
-        Write-Host "OBS letoltese..."
-        curl.exe -fL $url1 -o "obs.zip"
-        if (-not (Test-Path "obs.zip") -or (Get-Item "obs.zip").Length -lt 1000000) {
-            Write-Host "Masodik URL kiprobalasa..."
-            curl.exe -fL $url2 -o "obs.zip"
-        }
+        Write-Host "OBS Studio letoltese innen: $url"
+        curl.exe -fL $url -o "obs.zip"
         
         # Kibontas 7-Zip-pel
+        Write-Host "Kibontas folyamatban..."
         7z x "obs.zip" -o"C:\obs-bin" -y | Out-Null
         
         # OBS forraskod letoltese a fejlecfajlokhoz
+        Write-Host "OBS header forrasok letoltese..."
         git clone --depth 1 --branch 30.0.2 https://github.com/obsproject/obs-studio.git C:\obs-src
         
-        # obs.dll dinamikus felkutatasa
+        # obs.dll felkutatasa
         $dll = Get-ChildItem -Path "C:\obs-bin" -Filter "obs.dll" -Recurse | Select-Object -First 1 -ExpandProperty FullName
         if (-not $dll) {
             throw "Nem talalhato az obs.dll a kibontott fajlok kozott!"
@@ -66,6 +63,7 @@ jobs:
         [System.IO.File]::WriteAllLines("C:\obs-dev\obs.def", $defContent, [System.Text.Encoding]::ASCII)
         
         & lib /def:C:\obs-dev\obs.def /out:C:\obs-dev\obs.lib /machine:x64
+        Write-Host "OBS.lib sikeresen letrehozva C:\obs-dev\obs.lib helyen."
 
     - name: 5. Forditas (DLL)
       shell: pwsh
