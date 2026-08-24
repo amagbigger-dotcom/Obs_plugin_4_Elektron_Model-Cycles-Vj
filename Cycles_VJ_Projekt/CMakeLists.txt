@@ -17,18 +17,11 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-file(GLOB_RECURSE PLUGIN_SOURCES 
-    "*.cpp" 
-    "*.c" 
-    "*.hpp" 
-    "*.h"
-)
-
-add_library(${PROJECT_NAME} MODULE ${PLUGIN_SOURCES})
+# Csak a konkrét forrásfájlt adjuk hozzá, így a CMake belső fájljai nem kerülnek bele
+add_library(${PROJECT_NAME} MODULE plugin.cpp)
 
 target_link_directories(${PROJECT_NAME} PRIVATE ${OBS_LIB_DIR})
 
-# Itt van a kulcs: OBS es a Windows Multimedia (winmm) lib
 target_link_libraries(${PROJECT_NAME} PRIVATE 
     obs 
     winmm
