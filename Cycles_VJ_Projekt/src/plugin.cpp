@@ -1419,7 +1419,7 @@ static void df_def(obs_data_t* s) {
     obs_data_set_default_double(s, "zoom", 1.0); obs_data_set_default_int(s, "czoom", 21); obs_data_set_default_double(s, "rot", 0.0); obs_data_set_default_int(s, "crot", 19); obs_data_set_default_double(s, "mx", 1.0); obs_data_set_default_int(s, "cmx", 7);
 }
 static void df_rd(void* d, gs_effect_t*) {
-    auto* x = (df_d*)d; if (!x->eff || !obs_source_process_filter_begin(x->ctx, GS_RGBA, OBS_ALLOW_DIRECT_Rendering)) return;
+    auto* x = (df_d*)d; if (!x->eff || !obs_source_process_filter_begin(x->ctx, GS_RGBA, OBS_ALLOW_DIRECT_RENDERING)) return;
     auto& m = MidiCore::instance(); float note_hit = m.get_note(x->dev, x->ch) * x->n_int;
     gs_effect_set_float(gs_effect_get_param_by_name(x->eff, "p_drive"), x->drive + (m.get_cc(x->dev, x->ch, x->cdrive) * 4.0f) + (note_hit * 2.0f));
     gs_effect_set_float(gs_effect_get_param_by_name(x->eff, "p_bleed"), x->bleed + (m.get_cc(x->dev, x->ch, x->cbleed) * 3.0f));
