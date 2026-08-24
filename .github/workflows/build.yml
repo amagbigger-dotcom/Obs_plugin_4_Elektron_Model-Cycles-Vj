@@ -28,13 +28,11 @@ jobs:
         
         New-Item -ItemType Directory -Path "C:\obs-bin", "C:\obs-dev" -Force | Out-Null
         
-        # GitHub API-val kikeressuk a pontos .zip asset letoltesi linkjet
         Write-Host "OBS 30.0.2 letoltesi URL lekerese a GitHub API-bol..."
         $release = Invoke-RestMethod -Uri "https://api.github.com/repos/obsproject/obs-studio/releases/tags/30.0.2" -Headers @{ "User-Agent" = "PowerShell" }
         $asset = $release.assets | Where-Object { $_.name -like "*.zip" -and $_.name -notlike "*pdb*" } | Select-Object -First 1
         
         if (-not $asset) {
-            # Tartalek URL a standard OBS-Studio-30.0.2.zip nevhez
             $downloadUrl = "https://github.com/obsproject/obs-studio/releases/download/30.0.2/OBS-Studio-30.0.2.zip"
         } else {
             $downloadUrl = $asset.browser_download_url
@@ -49,7 +47,7 @@ jobs:
         Write-Host "OBS forraskod letoltese..."
         git clone --depth 1 https://github.com/obsproject/obs-studio.git -b 30.0.2 C:\obs-src
         
-        # obs.dll dinamikus megkeresese
+        # obs.dll felkutatasa
         $dll = Get-ChildItem -Path "C:\obs-bin" -Filter "obs.dll" -Recurse | Select-Object -First 1 -ExpandProperty FullName
         if (-not $dll) {
             throw "Nem talalhato az obs.dll a kibontott fajlok kozott!"
@@ -75,21 +73,43 @@ jobs:
     - name: 5. Forditas (DLL)
       shell: pwsh
       run: |
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DOBS_SRC="C:/obs-src" -DOBS_LIB_DIR="C:/obs-dev"
+        $ErrorActionPreference = "Stop"
+        
+        # Automatikusan megkeresi a CMakeLists.txt fajlt a repoban
+        $cmakeFile = Get-ChildItem -Path . -Filter "CMakeLists.txt" -Recurse | Select-Object -First 1
+        if (-not $cmakeFile) {
+            throw "Nem talalhato CMakeLists.txt a repoban! Gyozodj meg rola, hogy feltoltotted a CMakeLists.txt fajlt."
+        }
+        $sourceDir = $cmakeFile.DirectoryName
+        Write-Host "CMakeLists.txt konyvtar: $sourceDir"
+        
+        cmake -B build -S "$sourceDir" -DCMAKE_BUILD_TYPE=Release -DOBS_SRC="C:/obs-src" -DOBS_LIB_DIR="C:/obs-dev"
         cmake --build build --config Release --parallel
 
     - name: 6. Telepito (.exe) Generalasa
       shell: pwsh
       run: |
+        $ErrorActionPreference = "Stop"
+        
         $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
         if (-not (Test-Path $iscc)) {
             $iscc = (Get-Command ISCC.exe -ErrorAction Stop).Source
         }
-        & $iscc installer/setup.iss
+        
+        # Inno Setup szkript megkeresese
+        $issFile = Get-ChildItem -Path . -Filter "setup.iss" -Recurse | Select-Object -First 1
+        if ($issFile) {
+            & $iscc $issFile.FullName
+        } else {
+            & $iscc installer/setup.iss
+        }
 
     - name: 7. Telepito Feltoltese
       uses: actions/upload-artifact@v4
       with:
         name: Cycles_VJ_Plugin_Setup
-        path: installer/Output/Cycles_VJ_Setup.exe
+        path: |
+          installer/Output/*.exe
+          Output/*.exe
+          build/Release/*.dll
         if-no-files-found: error
